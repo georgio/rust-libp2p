@@ -18,8 +18,7 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 
-use libp2p_core::identity;
-use snow::SnowError;
+use noiseexplorer::error::NoiseError as NoiseExplorerError;
 use std::{error::Error, fmt, io};
 
 /// libp2p_noise error type.
@@ -28,15 +27,11 @@ pub enum NoiseError {
     /// An I/O error has been encountered.
     Io(io::Error),
     /// An noise framework error has been encountered.
-    Noise(SnowError),
+    Noise(NoiseExplorerError),
     /// A public key is invalid.
     InvalidKey,
-    /// A handshake payload is invalid.
-    InvalidPayload(protobuf::ProtobufError),
-    /// A signature was required and could not be created.
-    SigningError(identity::error::SigningError),
     #[doc(hidden)]
-    __Nonexhaustive
+    __Nonexhaustive,
 }
 
 impl fmt::Display for NoiseError {
@@ -45,9 +40,7 @@ impl fmt::Display for NoiseError {
             NoiseError::Io(e) => write!(f, "{}", e),
             NoiseError::Noise(e) => write!(f, "{}", e),
             NoiseError::InvalidKey => f.write_str("invalid public key"),
-            NoiseError::InvalidPayload(e) => write!(f, "{}", e),
-            NoiseError::SigningError(e) => write!(f, "{}", e),
-            NoiseError::__Nonexhaustive => f.write_str("__Nonexhaustive")
+            NoiseError::__Nonexhaustive => f.write_str("__Nonexhaustive"),
         }
     }
 }
@@ -58,9 +51,7 @@ impl Error for NoiseError {
             NoiseError::Io(e) => Some(e),
             NoiseError::Noise(_) => None, // TODO: `SnowError` should implement `Error`.
             NoiseError::InvalidKey => None,
-            NoiseError::InvalidPayload(e) => Some(e),
-            NoiseError::SigningError(e) => Some(e),
-            NoiseError::__Nonexhaustive => None
+            NoiseError::__Nonexhaustive => None,
         }
     }
 }
@@ -71,21 +62,8 @@ impl From<io::Error> for NoiseError {
     }
 }
 
-impl From<SnowError> for NoiseError {
-    fn from(e: SnowError) -> Self {
+impl From<NoiseExplorerError> for NoiseError {
+    fn from(e: NoiseExplorerError) -> Self {
         NoiseError::Noise(e)
     }
 }
-
-impl From<protobuf::ProtobufError> for NoiseError {
-    fn from(e: protobuf::ProtobufError) -> Self {
-        NoiseError::InvalidPayload(e)
-    }
-}
-
-impl From<identity::error::SigningError> for NoiseError {
-    fn from(e: identity::error::SigningError) -> Self {
-        NoiseError::SigningError(e)
-    }
-}
-
