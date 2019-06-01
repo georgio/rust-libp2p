@@ -23,6 +23,3 @@ libp2p-tcp = { version = "0.8.0", path = "../../transports/tcp" }
 quickcheck = "0.8"
 tokio = "0.1"
 sodiumoxide = "0.2"
-
-[workspace]
-dir = "./"
