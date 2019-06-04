@@ -69,35 +69,187 @@ pub enum NoiseSession {
 }
 
 impl NoiseSession {
-    pub fn read_message(&mut self, in_out: &mut [u8]) -> Result<(usize), NoiseError> {
+    pub fn read_message(&mut self, mut transport_buffer: Vec<u8>) -> Result<Vec<u8>, NoiseError> {
         match self {
             NoiseSession::ik(a) => {
-                a.recv_message(in_out)?;
-                Ok(in_out.len())
+                if a.get_message_count() > 1 && a.is_transport() {
+                    // transport
+                    // read all of it then output before index transport_buffer.len()-16
+                    a.recv_message(&mut transport_buffer[..])?;
+                    let (plaintext, _) = transport_buffer.split_at(transport_buffer.len()-16);
+                    Ok(Vec::from(&plaintext[..]))
+                }
+                else if a.get_message_count() == 0 {
+                    // message a, mc = 0
+                    // read all of it then output between index 80 and index transport_buffer.len()-16
+                    a.recv_message(&mut transport_buffer[..])?;
+                    let (plaintext, _) = &transport_buffer[80..].split_at(transport_buffer.len()-16);
+                    Ok(Vec::from(&plaintext[..]))
+                }
+                else {
+                    // message b, mc = 1
+                    // read all of it then output between index 32 and index transport_buffer.len()-16
+                    a.recv_message(&mut transport_buffer[..])?;
+                    let (plaintext, _) = &transport_buffer[32..].split_at(transport_buffer.len()-16);
+                    Ok(Vec::from(&plaintext[..]))
+                }
             }
             NoiseSession::ix(a) => {
-                a.recv_message(in_out)?;
-                Ok(in_out.len())
+                if a.get_message_count() > 1 && a.is_transport() {
+                    // transport
+                    // read all of it then output before index transport_buffer.len()-16
+                    a.recv_message(&mut transport_buffer[..])?;
+                    let (plaintext, _) = transport_buffer.split_at(transport_buffer.len()-16);
+                    Ok(Vec::from(&plaintext[..]))
+                }
+                else if a.get_message_count() == 0 {
+                    // message a, mc = 0
+                    // read all of it then output after 64
+                    a.recv_message(&mut transport_buffer[..])?;
+                    Ok(Vec::from(&transport_buffer[64..]))
+                }
+                else {
+                    // message b, mc = 1
+                    // read all of it then output between index 80 and index transport_buffer.len()-16
+                    a.recv_message(&mut transport_buffer[..])?;
+                    let (plaintext, _) = &transport_buffer[80..].split_at(transport_buffer.len()-16);
+                    Ok(Vec::from(&plaintext[..]))
+                }
+
             }
             NoiseSession::xx(a) => {
-                a.recv_message(in_out)?;
-                Ok(in_out.len())
+                if a.get_message_count() > 2 && a.is_transport() {
+                    // transport
+                    // read all of it then output before index transport_buffer.len()-16
+                    a.recv_message(&mut transport_buffer[..])?;
+                    let (plaintext, _) = transport_buffer.split_at(transport_buffer.len()-16);
+                    Ok(Vec::from(&plaintext[..]))
+                }
+                else if a.get_message_count() == 0 {
+                    // message a, mc = 0
+                    // read all of it then output after 32
+                    a.recv_message(&mut transport_buffer[..])?;
+                    Ok(Vec::from(&transport_buffer[32..]))
+                }
+                else if a.get_message_count() == 1 {
+                    // message b, mc = 1
+                    // read all of it then output between index 80 and index transport_buffer.len()-16
+                    a.recv_message(&mut transport_buffer[..])?;
+                    let (plaintext, _) = &transport_buffer[80..].split_at(transport_buffer.len()-16);
+                    Ok(Vec::from(&plaintext[..]))
+                }
+                else {
+                    // message c, mc = 2
+                    // read all of it then output between index 48 and index transport_buffer.len()-16
+                    a.recv_message(&mut transport_buffer[..])?;
+                    let (plaintext, _) = &transport_buffer[48..].split_at(transport_buffer.len()-16);
+                    Ok(Vec::from(&plaintext[..]))
+                }
             }
         }
     }
-    pub fn write_message(&mut self, in_out: &mut [u8]) -> Result<(usize), NoiseError> {
+    pub fn write_message(&mut self, mut plaintext: Vec<u8>) -> Result<Vec<u8>, NoiseError> {
         match self {
             NoiseSession::ik(a) => {
-                a.send_message(in_out)?;
-                Ok(in_out.len())
+                if a.get_message_count() > 1 && a.is_transport() {
+                    // transport
+                    plaintext.extend_from_slice(&mut [0u8; 16][..]);
+                    a.send_message(&mut plaintext[..])?;
+                    Ok(plaintext)
+                }
+                else if a.get_message_count() == 0 {
+                    // message a, mc = 0
+                    // append 80 empty bytes at start
+                    // append plaintext
+                    // append 16 at end
+                    let mut output: Vec<u8> = Vec::from(&[0u8; 80][..]);
+                    output.append(&mut plaintext);
+                    output.extend_from_slice(&mut [0u8; 16][..]);
+                    a.send_message(&mut output[..])?;
+                    //destroy plaintext
+                    Ok(output)
+                }
+                else {
+                    // message b, mc = 1
+                    // 32 empty bytes at start
+                    // append plaintext
+                    // append 16 at end
+                    let mut output: Vec<u8> = Vec::from(&[0u8; 32][..]);
+                    output.append(&mut plaintext);
+                    output.extend_from_slice(&mut [0u8; 16][..]);
+                    a.send_message(&mut output[..])?;
+                    //destroy plaintext
+                    Ok(output)
+                }
             }
             NoiseSession::ix(a) => {
-                a.send_message(in_out)?;
-                Ok(in_out.len())
+                if a.get_message_count() > 1 && a.is_transport() {
+                    // transport
+                    // append 16 at end
+                    plaintext.extend_from_slice(&mut [0u8; 16][..]);
+                    a.send_message(&mut plaintext[..])?;
+                    Ok(plaintext)
+                }
+                else if a.get_message_count() == 0 {
+                    // message a, mc = 0
+                    // append 64 empty bytes at start
+                    // append plaintext
+                    let mut output: Vec<u8> = Vec::from(&[0u8; 64][..]);
+                    output.append(&mut plaintext);
+                    a.send_message(&mut output[..])?;
+                    Ok(output)
+                }
+                else {
+                    // message b, mc = 1
+                    // 80 empty bytes at start
+                    // append plaintext
+                    // append 16 at end
+                    let mut output: Vec<u8> = Vec::from(&[0u8; 80][..]);
+                    output.append(&mut plaintext);
+                    output.extend_from_slice(&mut [0u8; 16][..]);
+                    a.send_message(&mut output[..])?;
+                    Ok(output)
+                }
             }
             NoiseSession::xx(a) => {
-                a.send_message(in_out)?;
-                Ok(in_out.len())
+                if a.get_message_count() > 2 && a.is_transport() {
+                    // transport
+                    // append 16 at end
+                    plaintext.extend_from_slice(&mut [0u8; 16][..]);
+                    a.send_message(&mut plaintext[..])?;
+                    Ok(plaintext)
+                }
+                else if a.get_message_count() == 0 {
+                    // message a, mc = 0
+                    // append 32 empty bytes at start
+                    // append plaintext
+                    let mut output: Vec<u8> = Vec::from(&[0u8; 32][..]);
+                    output.append(&mut plaintext);
+                    a.send_message(&mut output[..])?;
+                    Ok(output)
+                }
+                else if a.get_message_count() == 1 {
+                    // message b, mc = 1
+                    // 80 empty bytes at start
+                    // append plaintext
+                    // append 16 at end
+                    let mut output: Vec<u8> = Vec::from(&[0u8; 80][..]);
+                    output.append(&mut plaintext);
+                    output.extend_from_slice(&mut [0u8; 16][..]);
+                    a.send_message(&mut output[..])?;
+                    Ok(output)
+                }
+                else {
+                    // message c, mc = 2
+                    // 48 empty bytes at start
+                    // append plaintext
+                    // append 16 at end
+                    let mut output: Vec<u8> = Vec::from(&[0u8; 48][..]);
+                    output.append(&mut plaintext);
+                    output.extend_from_slice(&mut [0u8; 16][..]);
+                    a.send_message(&mut output[..])?;
+                    Ok(output)
+                }
             }
         }
     }
